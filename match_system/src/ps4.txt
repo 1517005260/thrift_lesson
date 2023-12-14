@@ -1,0 +1,18 @@
+现在，我们已经简陋地实现了match-client，match-server
+而匹配成功后，我们还要将match-server附加为data_save-client，上传至本课程已写好的data_save-server
+
+已写好的接口中，密码的md5sum值求取：
+md5sum
+输入myserver的密码
+<ctrl>+d
+复制前8位
+我的md5：93f93b4b
+
+同之前一样，用“thrift -r --gen cpp save.thrift所在目录”创建save_data的客户端
+记得一定要把skeleton给删了，否则就有两个main了,在cpp中，一定会报错
+
+之后，还是上官网的tutorial复制cpp的客户端代码,改动刚刚写好的main
+
+此时，由于我们要连的服务器是myserver，所以要改复制下来的host地址
+
+之后同之前一样编译+链接

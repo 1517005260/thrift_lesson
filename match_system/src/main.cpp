@@ -6,6 +6,9 @@
 #include <thrift/server/TSimpleServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TTransportUtils.h>
+#include <thrift/transport/TSocket.h>
+#include "save_client/Save.h"
 
 #include<iostream>
 #include<thread> //引入多线程
@@ -20,6 +23,7 @@ using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::server;
 
 using namespace  ::match_service;
+using namespace  ::save_service;//注意加命名空间
 
 using namespace std;//仅作测试用，多人开发时不能用这个
 
@@ -44,7 +48,23 @@ class Pool   //匹配池
     public:
         void save_results(int id1 ,int id2)
         {
-            printf("Match Result : %d %d",id1,id2);
+            printf("Match Result : %d %d\n",id1,id2);
+
+            //官网clinet代码复制于此
+            std::shared_ptr<TTransport> socket(new TSocket("123.57.67.128", 9090));
+            std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+            std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+            SaveClient client(protocol);
+
+            try {
+                transport->open();
+
+                client.save_data("ace_11842","93f93b4b",id1,id2);
+
+                transport->close();
+            } catch (TException& tx) {
+                cout << "ERROR: " << tx.what() << endl;
+            }
         }
 
         void match()
@@ -88,7 +108,7 @@ class MatchHandler : virtual public MatchIf {
         int32_t add_user(const User& user, const std::string& info) {
             // Your implementation goes here
             printf("add_user\n");
-            
+
             unique_lock<mutex> lck(message_queue.m);//用m给线程上锁
             message_queue.q.push({user,"add"});
             message_queue.cv.notify_all();//通知所有cv下阻塞的进程，有新的操作了，可以执行随机的下一个线程了
@@ -134,7 +154,7 @@ void consume_task() //死循环，一直判断匹配情况
             {
                 pool.remove(task.user);
             }
-                
+
             pool.match();
         }
     }
