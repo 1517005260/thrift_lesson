@@ -1,0 +1,20 @@
+src:源文件
+
+生成gen文件夹命令： thrift -r --gen 语言类型 链接地址
+             样例： thrift -r --gen cpp ../../thrift/match.thrift
+当然，具体的业务还要自己写
+
+之后，可以将生成的gen文件夹改名(这里是match_server)，方便识别它具体的用处。官方为我们生成的skeleton的代码可以复制到上级目录，改为main.cpp
+
+在main.cpp写业务逻辑的时候，可以先加return
+0，先把编译跑通,然后再逐步往里面添加模块
+
+C++编译步骤
+1.编译： g++ -c 你要编译的文件
+ex. g++ -c main.cpp match_server/*.cpp
+编译完后会有.o文件
+2.链接： g++ *.o -o 要链接的文件 引入外部库
+ex. g++ *.o -o main -lthrft (引入thrift的外部库)
+！！注意：踩过坑，要先删除skeleton的.o文件，否则main函数定义重复，会报错
+
+此外，commit时，不要上传.o文件和可执行文件，只加cpp这种源文件即可
