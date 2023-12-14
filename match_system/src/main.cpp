@@ -15,7 +15,8 @@
 #include<mutex>//引入锁，当一个线程持有锁时其他所有线程阻塞
 #include<condition_variable>//引入条件变量(封装锁)，配合锁实现消费队列
 #include<queue>
-#include<vector>//存匹配池的玩家
+#include<vector>//存匹配池的玩家i
+#include<unistd.h>//sleep函数头文件
 
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
@@ -46,9 +47,9 @@ struct MessageQueue
 class Pool   //匹配池
 {
     public:
-        void save_results(int id1 ,int id2)
+        void save_result(int a ,int b)//输入两个id
         {
-            printf("Match Result : %d %d\n",id1,id2);
+            printf("Match Result : %d %d\n",a,b);
 
             //官网clinet代码复制于此
             std::shared_ptr<TTransport> socket(new TSocket("123.57.67.128", 9090));
@@ -59,7 +60,9 @@ class Pool   //匹配池
             try {
                 transport->open();
 
-                client.save_data("ace_11842","93f93b4b",id1,id2);
+                int res=client.save_data("acs_11842","93f93b4b",a,b);
+                if(!res) puts("success!");//判断是否上传云端成功，成功则res为0“exitcode”
+                else puts("failed");
 
                 transport->close();
             } catch (TException& tx) {
@@ -71,11 +74,29 @@ class Pool   //匹配池
         {
             while(users.size()>=2)
             {
-                auto a = users[0], b = users[1];
-                users.erase(users.begin());
-                users.erase(users.begin());
+                bool flag = true;
 
-                save_results(a.id,b.id);
+                //先把所有人的分数排序
+                sort(users.begin(),users.end(),[&](User& a ,User b){
+                    return a.score<b.score;
+                        });//自定义sort
+
+                for (uint32_t i=1;i<users.size();i++)
+                {
+                    auto a = users[i-1], b = users[i];
+
+                    if (b.score - a.score <=50)
+                    {
+                        users.erase(users.begin()+i-1,users.begin()+i+1);//删除匹配成功的两位
+                        save_result(a.id,b.id);
+
+                        flag = false;
+                        break;
+                    }
+
+                    if (flag) break;//玩家分差过大且玩家过少，无法依据现有逻辑匹配，会进入死循环
+
+                }
             }
         }
 
@@ -138,7 +159,11 @@ void consume_task() //死循环，一直判断匹配情况
         unique_lock<mutex> lck(message_queue.m);
         if (message_queue.q.empty())
         {
-            message_queue.cv.wait(lck); //队列空，为了节省cpu资源，阻塞于此，等待唤醒
+           //此方法已被优化 message_queue.cv.wait(lck); //队列空，为了节省cpu资源，阻塞于此，等待唤醒
+
+            lck.unlock();
+            pool.match();
+            sleep(1);//每秒匹配一次
         }
         else
         {
