@@ -1,0 +1,12 @@
+同样进入src文件，thrift -r --gen py ../../thrift/match.thrift
+
+由于我们只想实现match功能的客户端，所以可执行文件Match-remote可以删除，防止歧义
+
+client的代码可从官网tutorial复制，然后自己改,并删除无用代码
+注意引入库的时候要改路径,路径不要后缀，只要名字即可（ex 引入a.py时不要加.py）
+
+改完代码运行时注意先要运行刚刚用c++写好的服务，否则会报错
+
+运行成功后，我们会在cpp下的服务看到“add_user”，即我们用python程序成功调用了cpp代码
+
+在commit代码时，同刚刚一样，删除.pyc文件
