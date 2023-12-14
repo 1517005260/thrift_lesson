@@ -8,6 +8,11 @@
 #include <thrift/transport/TBufferTransports.h>
 
 #include<iostream>
+#include<thread> //引入多线程
+#include<mutex>//引入锁，当一个线程持有锁时其他所有线程阻塞
+#include<condition_variable>//引入条件变量(封装锁)，配合锁实现消费队列
+#include<queue>
+#include<vector>//存匹配池的玩家
 
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
@@ -18,6 +23,62 @@ using namespace  ::match_service;
 
 using namespace std;//仅作测试用，多人开发时不能用这个
 
+
+//定义消费队列
+struct Task
+{
+    User user;
+    string type;
+};
+
+struct MessageQueue
+{
+    queue<Task> q;
+    mutex m; //唯一锁
+    condition_variable cv;
+}message_queue;
+
+
+class Pool   //匹配池
+{
+    public:
+        void save_results(int id1 ,int id2)
+        {
+            printf("Match Result : %d %d",id1,id2);
+        }
+
+        void match()
+        {
+            while(users.size()>=2)
+            {
+                auto a = users[0], b = users[1];
+                users.erase(users.begin());
+                users.erase(users.begin());
+
+                save_results(a.id,b.id);
+            }
+        }
+
+        void add(User user)
+        {
+            users.push_back(user);
+        }
+
+        void remove(User user)
+        {
+            //找到id来删除
+            for (uint32_t i=0;i<users.size();i++)
+                if (users[i].id == user.id)
+                {
+                    users.erase(users.begin()+i);
+                    break;
+                }
+        }
+
+    private:
+        vector<User> users;
+}pool;
+
 class MatchHandler : virtual public MatchIf {
     public:
         MatchHandler() {
@@ -27,6 +88,10 @@ class MatchHandler : virtual public MatchIf {
         int32_t add_user(const User& user, const std::string& info) {
             // Your implementation goes here
             printf("add_user\n");
+            
+            unique_lock<mutex> lck(message_queue.m);//用m给线程上锁
+            message_queue.q.push({user,"add"});
+            message_queue.cv.notify_all();//通知所有cv下阻塞的进程，有新的操作了，可以执行随机的下一个线程了
 
             return 0;
         }
@@ -35,10 +100,45 @@ class MatchHandler : virtual public MatchIf {
             // Your implementation goes here
             printf("remove_user\n");
 
+            unique_lock<mutex> lck(message_queue.m);//两个线程同时仅有一个能有锁，无锁的阻塞于此，等待拿锁
+            message_queue.q.push({user,"remove"});
+            message_queue.cv.notify_all();
             return 0;
         }
 
 };
+
+
+//增加多线程操作
+//经典的消费者-生产者模型
+void consume_task() //死循环，一直判断匹配情况
+{
+    while(true)
+    {
+        unique_lock<mutex> lck(message_queue.m);
+        if (message_queue.q.empty())
+        {
+            message_queue.cv.wait(lck); //队列空，为了节省cpu资源，阻塞于此，等待唤醒
+        }
+        else
+        {
+            auto task = message_queue.q.front();
+            message_queue.q.pop();
+            lck.unlock();//用完后记得解锁
+
+            //do task,即把玩家放入匹配池
+            if (task.type == "add")
+            {
+                pool.add(task.user);
+            }else if (task.type == "remove")
+            {
+                pool.remove(task.user);
+            }
+                
+            pool.match();
+        }
+    }
+}
 
 int main(int argc, char **argv) {
     int port = 9090;
@@ -51,6 +151,10 @@ int main(int argc, char **argv) {
     TSimpleServer server(processor, serverTransport, transportFactory, protocolFactory);
 
     cout << "Started!" << endl ;
+
+    //开一个线程
+    thread matching_thread(consume_task);
+
     server.serve();
     return 0;
 }
