@@ -181,13 +181,6 @@ class MatchCloneFactory : virtual public MatchIfFactory {
         MatchIf* getHandler(const ::apache::thrift::TConnectionInfo& connInfo) override
         {
             std::shared_ptr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
-            /*
-            cout << "Incoming connection\n";
-            cout << "\tSocketInfo: "  << sock->getSocketInfo() << "\n";
-            cout << "\tPeerHost: "    << sock->getPeerHost() << "\n";
-            cout << "\tPeerAddress: " << sock->getPeerAddress() << "\n";
-            cout << "\tPeerPort: "    << sock->getPeerPort() << "\n";
-            */
             return new MatchHandler;
         }
         void releaseHandler( MatchIf* handler) override {
@@ -223,8 +216,6 @@ void consume_task() //死循环，一直判断匹配情况
             {
                 pool.remove(task.user);
             }
-
-            //pool.match();新逻辑要删掉这个，不然就是每来一个人就等待秒数+1
         }
     }
 }
