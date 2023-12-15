@@ -11,10 +11,10 @@ md5sum
 同之前一样，用“thrift -r --gen cpp save.thrift所在目录”创建save_data的客户端
 记得一定要把skeleton给删了，否则就有两个main了,在cpp中，一定会报错
 
-之后，还是上官网的tutorial复制cpp的客户端代码,改动刚刚写好的main
+之后，还是上官网的tutorial复制cpp的客户端代码,改动刚刚写好的main,注意官网中的tutorial和Calculator全部要改为自己的代码。
 
 此时，由于我们要连的服务器是myserver，所以要改复制下来的host地址
 
 之后同之前一样编译+链接
 
-现在，基本的框架就写好了。之后的工作就是优化匹配逻辑
+现在，基本的框架就写好了。之后的工作就是优化匹配逻辑。有关这部分，可以再取官网复制代码，注意刚刚是复制client的，现在是server。
