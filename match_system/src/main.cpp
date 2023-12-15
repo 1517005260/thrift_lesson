@@ -74,39 +74,58 @@ class Pool   //匹配池
             }
         }
 
-        void match()
+        bool check_match(uint32_t i, uint32_t j)
         {
+            auto a=users[i], b=users[j];
+            int dt = abs(a.score - b.score);
+
+            int a_max = wt[i]*50;
+            int b_max = wt[j]*50;
+
+            return dt<=a_max && dt<=b_max;
+
+        }
+
+        void match(){
+            
+            for (uint32_t i=0;i<wt.size();i++)
+                wt[i]++;//等待秒数+1
+
             while(users.size()>=2)
             {
                 bool flag = true;
 
-                //先把所有人的分数排序
-                sort(users.begin(),users.end(),[&](User& a ,User b){
-                        return a.score<b.score;
-                        });//自定义sort
-
-                for (uint32_t i=1;i<users.size();i++)
+                for (uint32_t i=0;i<users.size();i++)//新逻辑：两重循环匹配判断玩家i和玩家j能否匹配，无需排序
                 {
-                    auto a = users[i-1], b = users[i];
-
-                    if (b.score - a.score <=50)
+                    for (uint32_t j=i+1 ; j<users.size();j++ )
                     {
-                        users.erase(users.begin()+i-1,users.begin()+i+1);//删除匹配成功的两位
-                        save_result(a.id,b.id);
+                        if (check_match(i,j))
+                        {
+                            auto a=users[i], b=users[j];
 
-                        flag = false;
-                        break;
+                            users.erase(users.begin() +j);//要先删j，因为j>i，先删i再删j实际删的是j-1
+                            users.erase(users.begin() +i);
+                            wt.erase(wt.begin() +j);
+                            wt.erase(wt.begin() +i);
+
+                            save_result(a.id,b.id);
+                            flag = false;
+                            break;
+                        }
                     }
 
-                    if (flag) break;//玩家分差过大且玩家过少，无法依据现有逻辑匹配，会进入死循环
-
+                    if(!flag) break;
                 }
-            }
+
+                    if (flag) break;
+
+              }
         }
 
         void add(User user)
         {
             users.push_back(user);
+            wt.push_back(0);
         }
 
         void remove(User user)
@@ -116,12 +135,14 @@ class Pool   //匹配池
                 if (users[i].id == user.id)
                 {
                     users.erase(users.begin()+i);
+                    wt.erase(wt.begin()+i);
                     break;
                 }
         }
 
     private:
         vector<User> users;
+        vector<int>  wt;//WtingTime匹配逻辑优化：存储每个玩家匹配的秒数（由于每秒匹配一次，也可理解为匹配的次数），现在是再+-50区间内匹配，优化为：1s：+-50，2S：+-100，...，以此类推
 }pool;
 
 class MatchHandler : virtual public MatchIf {
@@ -184,8 +205,6 @@ void consume_task() //死循环，一直判断匹配情况
         unique_lock<mutex> lck(message_queue.m);
         if (message_queue.q.empty())
         {
-            //此方法已被优化 message_queue.cv.wait(lck); //队列空，为了节省cpu资源，阻塞于此，等待唤醒
-
             lck.unlock();
             pool.match();
             sleep(1);//每秒匹配一次
@@ -205,7 +224,7 @@ void consume_task() //死循环，一直判断匹配情况
                 pool.remove(task.user);
             }
 
-            pool.match();
+            //pool.match();新逻辑要删掉这个，不然就是每来一个人就等待秒数+1
         }
     }
 }
